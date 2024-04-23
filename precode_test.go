@@ -11,24 +11,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testingMapKey = "TestCity#42"
+
 func TestMainHandlerWhenCountMoreThanTotal(t *testing.T) {
-	totalCount := len(cafeList["moscow"])
-	reqURL := fmt.Sprintf("/cafe?count=%d&city=moscow", totalCount+1)
+
+	_, ok := cafeList[testingMapKey]
+	require.Falsef(t, ok, "Testing data already appering with key \"%s\"", testingMapKey)
+	cafeList[testingMapKey] = []string{"test1", "test2", "test3"}
+	defer delete(cafeList, testingMapKey)
+
+	totalCount := 3
+	reqURL := fmt.Sprintf("/cafe?count=%d&city=%s", totalCount+1, testingMapKey)
 	req := httptest.NewRequest(http.MethodGet, reqURL, nil)
 
 	responseRecorder := httptest.NewRecorder()
 	handler := http.HandlerFunc(mainHandle)
 	handler.ServeHTTP(responseRecorder, req)
 
-	if status := responseRecorder.Code; status != http.StatusOK {
-		t.Errorf("expected status code: %d, got %d", http.StatusOK, status)
-	}
+	assert.Equal(t, http.StatusOK, responseRecorder.Code)
 
 	got := strings.Split(responseRecorder.Body.String(), ",")
-	expected := cafeList["moscow"]
+	expected := cafeList[testingMapKey]
 
 	assert.Len(t, got, totalCount)
-	require.Equal(t, expected, got)
+	require.ElementsMatch(t, expected, got)
 }
 
 func TestMainHandlerWhitoutCount(t *testing.T) {
@@ -39,9 +45,7 @@ func TestMainHandlerWhitoutCount(t *testing.T) {
 	handler := http.HandlerFunc(mainHandle)
 	handler.ServeHTTP(responseRecorder, req)
 
-	if status := responseRecorder.Code; status != http.StatusBadRequest {
-		t.Errorf("expected status code: %d, got %d", http.StatusBadRequest, status)
-	}
+	assert.Equal(t, http.StatusBadRequest, responseRecorder.Code)
 
 	got := responseRecorder.Body.String()
 
@@ -56,9 +60,7 @@ func TestMainHandlerWhenCountIsAString(t *testing.T) {
 	handler := http.HandlerFunc(mainHandle)
 	handler.ServeHTTP(responseRecorder, req)
 
-	if status := responseRecorder.Code; status != http.StatusBadRequest {
-		t.Errorf("expected status code: %d, got %d", http.StatusBadRequest, status)
-	}
+	assert.Equal(t, http.StatusBadRequest, responseRecorder.Code)
 
 	got := responseRecorder.Body.String()
 
@@ -66,8 +68,13 @@ func TestMainHandlerWhenCountIsAString(t *testing.T) {
 }
 
 func TestMainHandlerWhenCountLessThanHave(t *testing.T) {
+	_, ok := cafeList[testingMapKey]
+	require.Falsef(t, ok, "Testing data already appering with key \"%s\"", testingMapKey)
+	cafeList[testingMapKey] = []string{"test1", "test2", "test3"}
+	defer delete(cafeList, testingMapKey)
+
 	totalCount := 2
-	reqURL := fmt.Sprintf("/cafe?count=%d&city=moscow", totalCount)
+	reqURL := fmt.Sprintf("/cafe?count=%d&city=%s", totalCount, testingMapKey)
 
 	req := httptest.NewRequest(http.MethodGet, reqURL, nil)
 
@@ -75,28 +82,28 @@ func TestMainHandlerWhenCountLessThanHave(t *testing.T) {
 	handler := http.HandlerFunc(mainHandle)
 	handler.ServeHTTP(responseRecorder, req)
 
-	if status := responseRecorder.Code; status != http.StatusOK {
-		t.Errorf("expected status code: %d, got %d", http.StatusOK, status)
-	}
+	assert.Equal(t, http.StatusOK, responseRecorder.Code)
 
-	expected := []string{"Мир кофе", "Сладкоежка"}
+	expected := []string{"test1", "test2"}
 	got := strings.Split(responseRecorder.Body.String(), ",")
 
 	require.Len(t, got, totalCount)
-	require.Equal(t, expected, got)
+	require.ElementsMatch(t, expected, got)
 }
 
 func TestMainHandlerWhenCityIsNotInList(t *testing.T) {
 
-	req := httptest.NewRequest(http.MethodGet, "/cafe?count=4&city=cairo", nil)
+	_, ok := cafeList[testingMapKey]
+	require.Falsef(t, ok, "Testing data already appering with key \"%s\"", testingMapKey)
+
+	reqURL := fmt.Sprintf("/cafe?count=3&city=%s", testingMapKey)
+	req := httptest.NewRequest(http.MethodGet, reqURL, nil)
 
 	responseRecorder := httptest.NewRecorder()
 	handler := http.HandlerFunc(mainHandle)
 	handler.ServeHTTP(responseRecorder, req)
 
-	if status := responseRecorder.Code; status != http.StatusBadRequest {
-		t.Errorf("expected status code: %d, got %d", http.StatusBadRequest, status)
-	}
+	assert.Equal(t, http.StatusBadRequest, responseRecorder.Code)
 
 	got := responseRecorder.Body.String()
 
